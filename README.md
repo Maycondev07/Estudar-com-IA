@@ -75,18 +75,22 @@ Acesse http://localhost:3000
 
 ## 2. Conseguindo uma chave de API de IA
 
-Já vem configurado para o **Google Gemini** (modelo `gemini-2.5-flash`), que
+Já vem configurado para o **Google Gemini** (modelo `gemini-3.6-flash`), que
 tem plano gratuito sem cartão de crédito:
 
 1. Acesse https://aistudio.google.com/apikey (entre com uma conta Google).
 2. Clique em "Create API key".
 3. Cole em `AI_API_KEY` no `.env.local`.
 
-Limites do plano gratuito do Gemini variam por modelo (no `gemini-2.5-flash`
-gira em torno de ~10 requisições/minuto e ~500/dia — a Google ajusta esses
-números com frequência, então vale conferir a página de limites da conta
-antes de ir para produção). Se estourar, a API responde com erro 429 e
-volta ao normal na próxima janela.
+Os limites do plano gratuito do Gemini mudam com frequência por modelo —
+confira o valor atual em aistudio.google.com antes de ir para produção. Se
+estourar, a API responde com erro 429 e volta ao normal na próxima janela.
+
+**Nota:** a Google descontinua modelos do Gemini periodicamente para novas
+contas (foi o que aconteceu com o `gemini-2.5-flash`, por exemplo). Se um
+dia a API começar a responder erro 404 dizendo que o modelo não existe
+mais, é só trocar o valor de `AI_API_MODEL` (aqui e na Vercel) pelo modelo
+mais novo que a mensagem de erro recomendar.
 
 Quer usar **Groq**, **DeepSeek**, **Qwen** (Alibaba) ou **Kimi** (Moonshot)
 em vez disso? Só trocar as 3 variáveis `AI_API_BASE_URL`, `AI_API_MODEL` e
