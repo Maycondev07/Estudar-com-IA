@@ -55,9 +55,9 @@ const server = http.createServer((req, res) => {
     req.on("end", async () => {
       try {
         const payload = body ? JSON.parse(body) : {};
-        const reply = await handleChat(payload);
+        const result = await handleChat(payload);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ reply }));
+        res.end(JSON.stringify(result));
       } catch (err) {
         res.writeHead(err.status || 500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: err.message }));

@@ -7,8 +7,8 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const reply = await handleChat(req.body || {});
-    res.status(200).json({ reply });
+    const result = await handleChat(req.body || {});
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

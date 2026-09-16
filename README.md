@@ -8,7 +8,13 @@ pessoa + **Sair**, se já estiver logada).
 
 - **Início** (`index.html`) — chat com o Treineiro (diagnóstico, plano de
   estudos, simulados). Funciona sem login; para *salvar* um simulado ao
-  final, a IA pede para entrar ou criar conta.
+  final, a IA pede para entrar ou criar conta. Renderiza Markdown de verdade
+  (negrito, listas, tabelas), muda de layout no modo Simulado (visual de
+  prova, com cronômetro) e mostra, no canto inferior esquerdo, uma
+  estimativa local de tokens restantes no dia. A IA também pode executar
+  ações reais no site quando o usuário pede diretamente — mudar nome/prova
+  alvo, adicionar/atualizar/remover matéria, ou navegar pra outra página —
+  com feedback em toast no canto inferior direito.
 - **Entrar** (`login.html`) — cadastro/login por e-mail e senha.
 - **Simulados** (`simulados.html`) — histórico de simulados. Exige login
   (é onde os dados ficam guardados). Pode ser salvo automaticamente a
@@ -172,7 +178,6 @@ README.md
 ## 5. Próximos passos sugeridos
 
 - Exportar o plano de estudos em PDF.
-- Cronômetro real durante o simulado no nível "prova real".
 - Login social (Google) — o Supabase suporta, só precisa habilitar o
   provedor no painel e ajustar `login.js`.
 

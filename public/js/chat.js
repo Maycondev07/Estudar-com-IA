@@ -1,5 +1,13 @@
 const WELCOME = `Oi! Eu sou o Treineiro. Me diz qual prova, vestibular ou certificação você quer estudar (ex: "ITA", "Enem", "OAB primeira fase", "AWS Solutions Architect") que eu já te digo o nível de dificuldade dela e monto um diagnóstico inicial.`;
 
+// Ajuste esse número pra bater com o limite diário (em tokens) do seu
+// provedor de IA — é só uma estimativa local, calculada a partir do "usage"
+// que a API retorna a cada resposta; não é o contador oficial do provedor.
+const DAILY_TOKEN_BUDGET = 200000;
+
+const PAGINAS_PERMITIDAS = ["index.html", "materias.html", "simulados.html", "perfil.html", "login.html"];
+const NIVEIS_VALIDOS = ["fraco", "medio", "bom"];
+
 let state = {
   messages: [{ role: "assistant", content: WELCOME }],
   mode: "livre",
@@ -7,6 +15,12 @@ let state = {
   loading: false,
 };
 let currentUser = null;
+let examTimerInterval = null;
+let examStartTime = null;
+
+if (window.marked) {
+  marked.setOptions({ breaks: true, gfm: true });
+}
 
 (async function main() {
   currentUser = await getOptionalUser();
@@ -15,6 +29,7 @@ let currentUser = null;
 
   state.messages = Store.getChatHistorico() || state.messages;
   renderMessages();
+  renderTokenCounter();
 
   document.getElementById("mode-seg").addEventListener("click", (e) => {
     const btn = e.target.closest("button");
@@ -22,6 +37,7 @@ let currentUser = null;
     state.mode = btn.dataset.mode;
     document.querySelectorAll("#mode-seg button").forEach((b) => b.classList.toggle("active", b === btn));
     document.getElementById("difficulty-wrap").style.display = state.mode === "simulado" ? "flex" : "none";
+    aplicarModoVisual();
   });
 
   document.getElementById("difficulty-seg").addEventListener("click", (e) => {
@@ -29,6 +45,7 @@ let currentUser = null;
     if (!btn) return;
     state.difficulty = btn.dataset.diff;
     document.querySelectorAll("#difficulty-seg button").forEach((b) => b.classList.toggle("active", b === btn));
+    atualizarExamBadge();
   });
 
   document.getElementById("send-btn").addEventListener("click", sendMessage);
@@ -65,6 +82,47 @@ async function maybeIniciarCalibragem() {
 
   document.getElementById("input").value = mensagemInicial;
   await sendMessage();
+}
+
+// ---------- Layout de prova (modo simulado) ----------
+function aplicarModoVisual() {
+  const emProva = state.mode === "simulado";
+  document.getElementById("chat-wrap").classList.toggle("modo-prova", emProva);
+  document.getElementById("exam-header").style.display = emProva ? "flex" : "none";
+  if (emProva) iniciarExamTimer();
+  else pararExamTimer();
+  atualizarExamBadge();
+}
+
+function atualizarExamBadge() {
+  const el = document.getElementById("exam-badge");
+  if (!el) return;
+  const labels = { aprendizado: "🟩 aprendizado", intermediario: "🟨 intermediário", prova_real: "🟥 prova real" };
+  el.textContent = state.difficulty ? `Simulado — ${labels[state.difficulty]}` : "Simulado — escolha a dificuldade";
+}
+
+function iniciarExamTimer() {
+  examStartTime = Date.now();
+  atualizarExamTimer();
+  clearInterval(examTimerInterval);
+  examTimerInterval = setInterval(atualizarExamTimer, 1000);
+}
+
+function pararExamTimer() {
+  clearInterval(examTimerInterval);
+  examTimerInterval = null;
+  examStartTime = null;
+  const el = document.getElementById("exam-timer");
+  if (el) el.textContent = "00:00";
+}
+
+function atualizarExamTimer() {
+  const el = document.getElementById("exam-timer");
+  if (!el || !examStartTime) return;
+  const s = Math.floor((Date.now() - examStartTime) / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  el.textContent = `${mm}:${ss}`;
 }
 
 async function sendMessage() {
@@ -110,10 +168,18 @@ async function sendMessage() {
     if (!res.ok) {
       showError(data.error || "Erro desconhecido.");
     } else {
-      state.messages.push({ role: "assistant", content: data.reply });
+      const { texto, acoes } = extrairAcoes(data.reply);
+      state.messages.push({ role: "assistant", content: texto });
       Store.setChatHistorico(state.messages);
-      checkForScore(data.reply);
-      checkForMaterias(data.reply);
+      checkForScore(texto);
+      checkForMaterias(texto);
+      if (data.usage && data.usage.total_tokens) {
+        registrarTokensUsados(data.usage.total_tokens);
+      }
+      if (acoes.length) {
+        // não trava a resposta: executa em seguida, com feedback via toast
+        executarAcoes(acoes);
+      }
     }
   } catch (err) {
     showError(err.message);
@@ -121,6 +187,132 @@ async function sendMessage() {
     state.loading = false;
     renderMessages();
   }
+}
+
+// ---------- Ações que a IA pode executar direto no site ----------
+function extrairAcoes(reply) {
+  const linhas = reply.split("\n");
+  const acoes = [];
+  const restante = [];
+
+  linhas.forEach((linha) => {
+    const m = linha.match(/^\s*A[ÇC][AÃ]O:\s*(\w+)\s*\|\s*(.+)$/i);
+    if (m) {
+      acoes.push({ tipo: m[1].toLowerCase(), args: parseArgsAcao(m[2]) });
+    } else {
+      restante.push(linha);
+    }
+  });
+
+  const texto = restante.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { texto: texto || reply, acoes };
+}
+
+function parseArgsAcao(str) {
+  const args = {};
+  str.split("|").forEach((par) => {
+    const idx = par.indexOf("=");
+    if (idx === -1) return;
+    const chave = par.slice(0, idx).trim().toLowerCase();
+    const valor = par.slice(idx + 1).trim();
+    if (chave) args[chave] = valor;
+  });
+  return args;
+}
+
+function normalizarNivel(v) {
+  const n = (v || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return NIVEIS_VALIDOS.includes(n) ? n : "medio";
+}
+
+async function executarAcoes(acoes) {
+  if (!currentUser) {
+    showToast("O Treineiro tentou fazer uma alteração, mas é preciso entrar ou criar conta pra isso funcionar.", "erro");
+    return;
+  }
+
+  for (const acao of acoes) {
+    try {
+      if (acao.tipo === "definir_perfil") {
+        const changes = {};
+        if (acao.args.nome !== undefined) changes.nome = acao.args.nome;
+        if (acao.args.prova_alvo !== undefined) changes.prova_alvo = acao.args.prova_alvo;
+        if (Object.keys(changes).length) {
+          await Store.setPerfil(changes);
+          showToast("✓ Perfil atualizado.");
+        }
+      } else if (acao.tipo === "adicionar_materia") {
+        if (!acao.args.nome) continue;
+        await Store.addMateria({ nome: acao.args.nome, nivel: normalizarNivel(acao.args.nivel) });
+        showToast(`✓ Matéria "${acao.args.nome}" adicionada.`);
+      } else if (acao.tipo === "atualizar_materia") {
+        if (!acao.args.nome) continue;
+        const materias = await Store.getMaterias();
+        const alvo = materias.find((m) => m.nome.trim().toLowerCase() === acao.args.nome.trim().toLowerCase());
+        if (alvo) {
+          await Store.updateMateria(alvo.id, { nivel: normalizarNivel(acao.args.nivel) });
+          showToast(`✓ Nível de "${acao.args.nome}" atualizado.`);
+        }
+      } else if (acao.tipo === "remover_materia") {
+        if (!acao.args.nome) continue;
+        const materias = await Store.getMaterias();
+        const alvo = materias.find((m) => m.nome.trim().toLowerCase() === acao.args.nome.trim().toLowerCase());
+        if (alvo) {
+          await Store.deleteMateria(alvo.id);
+          showToast(`✓ Matéria "${acao.args.nome}" removida.`);
+        }
+      } else if (acao.tipo === "navegar") {
+        const pagina = (acao.args.pagina || "").trim();
+        if (PAGINAS_PERMITIDAS.includes(pagina)) {
+          showToast(`↳ Indo para ${pagina}…`);
+          setTimeout(() => {
+            window.location.href = pagina;
+          }, 650);
+        }
+      }
+    } catch (err) {
+      showToast("Não consegui executar uma ação: " + err.message, "erro");
+    }
+  }
+}
+
+// ---------- Contador de tokens restantes hoje (estimativa local) ----------
+function getTokenUsageKey() {
+  const dia = new Date().toISOString().slice(0, 10);
+  return `treineiro_tokens_${currentUser ? currentUser.id : "visitante"}_${dia}`;
+}
+
+function getTokensUsadosHoje() {
+  const raw = localStorage.getItem(getTokenUsageKey());
+  return raw ? parseInt(raw, 10) || 0 : 0;
+}
+
+function registrarTokensUsados(qtd) {
+  const usados = getTokensUsadosHoje() + qtd;
+  localStorage.setItem(getTokenUsageKey(), String(usados));
+  renderTokenCounter();
+}
+
+function renderTokenCounter() {
+  const el = document.getElementById("token-counter");
+  if (!el) return;
+  const usados = getTokensUsadosHoje();
+  const restantes = Math.max(0, DAILY_TOKEN_BUDGET - usados);
+  el.textContent = `🪙 ${restantes.toLocaleString("pt-BR")} tokens restantes hoje (estimativa)`;
+}
+
+// ---------- Toasts (feedback rápido de ações) ----------
+function showToast(mensagem, tipo) {
+  const stack = document.getElementById("toast-stack");
+  if (!stack) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (tipo === "erro" ? " erro" : "");
+  el.textContent = mensagem;
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), 4200);
 }
 
 function checkForScore(reply) {
@@ -252,7 +444,12 @@ function renderMessages() {
       <div class="msg-role ${m.role === "user" ? "user" : ""}">${m.role === "user" ? "você" : "treineiro"}</div>
       <div class="msg-content"></div>
     `;
-    row.querySelector(".msg-content").textContent = m.content;
+    const contentEl = row.querySelector(".msg-content");
+    if (window.marked && window.DOMPurify) {
+      contentEl.innerHTML = DOMPurify.sanitize(marked.parse(m.content || ""));
+    } else {
+      contentEl.textContent = m.content;
+    }
     container.appendChild(row);
   });
   if (state.loading) {

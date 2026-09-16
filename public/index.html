@@ -67,10 +67,45 @@
     }
     .msg-role.user { color: var(--accent); }
     .msg-content {
-      white-space: pre-wrap;
       line-height: 1.6;
       font-size: 15.5px;
     }
+    .msg-content p { margin: 0 0 12px; }
+    .msg-content p:last-child { margin-bottom: 0; }
+    .msg-content strong { font-weight: 700; }
+    .msg-content ul, .msg-content ol { margin: 0 0 12px; padding-left: 22px; }
+    .msg-content li { margin-bottom: 4px; }
+    .msg-content li > p { margin: 0; }
+    .msg-content code {
+      background: var(--panel-raised);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+    .msg-content pre {
+      background: var(--panel-raised);
+      padding: 12px 14px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 0 0 12px;
+    }
+    .msg-content pre code { background: none; padding: 0; }
+    .msg-content table { border-collapse: collapse; margin: 0 0 12px; width: 100%; font-size: 14px; }
+    .msg-content th, .msg-content td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+    .msg-content blockquote {
+      border-left: 3px solid var(--accent-dim);
+      margin: 0 0 12px;
+      padding: 2px 14px;
+      color: var(--ink-dim);
+    }
+    .msg-content h1, .msg-content h2, .msg-content h3 {
+      font-family: var(--serif);
+      margin: 16px 0 8px;
+      font-size: 1.15em;
+    }
+    .msg-content h1:first-child, .msg-content h2:first-child, .msg-content h3:first-child { margin-top: 0; }
+
     .composer {
       border-top: 1px solid var(--line);
       background: var(--panel);
@@ -109,12 +144,88 @@
       font-size: 13.5px;
       display: none;
     }
+
+    /* ---------- Modo simulado: layout de prova ---------- */
+    .exam-header {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 40px 14px;
+      padding: 12px 16px;
+      border: 1px solid var(--accent-dim);
+      border-radius: 6px;
+      background: var(--panel-raised);
+      font-family: var(--mono);
+      font-size: 12.5px;
+    }
+    .exam-badge { color: var(--accent); letter-spacing: 0.4px; }
+    .exam-timer { color: var(--ink-dim); }
+    .chat-wrap.modo-prova .messages { background: var(--panel-raised); }
+    .chat-wrap.modo-prova .msg-row {
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .chat-wrap.modo-prova .msg-row:last-child { margin-bottom: 0; }
+    .chat-wrap.modo-prova .msg-role {
+      width: auto;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      padding-top: 0;
+    }
+    .chat-wrap.modo-prova .msg-content {
+      font-family: var(--serif);
+      font-size: 16px;
+    }
+    .chat-wrap.modo-prova .composer { background: var(--panel-raised); }
+
+    /* ---------- Toasts (feedback de ações da IA) ---------- */
+    #toast-stack {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 50;
+      max-width: 320px;
+    }
+    .toast {
+      background: var(--panel-raised);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--ink);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    }
+    .toast.erro { border-left-color: var(--red); }
+
+    /* ---------- Contador discreto de tokens ---------- */
+    .token-counter {
+      position: fixed;
+      left: 14px;
+      bottom: 10px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--ink-dim);
+      opacity: 0.6;
+      background: var(--panel);
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--line);
+      z-index: 5;
+    }
   </style>
 </head>
 <body>
   <div id="navbar" class="navbar"></div>
 
-  <div class="chat-wrap">
+  <div class="chat-wrap" id="chat-wrap">
     <div class="controls-bar">
       <span class="label">modo</span>
       <div class="seg" id="mode-seg">
@@ -129,6 +240,11 @@
           <button data-diff="prova_real">🟥 prova real</button>
         </div>
       </div>
+    </div>
+
+    <div id="exam-header" class="exam-header">
+      <span class="exam-badge" id="exam-badge">Simulado — escolha a dificuldade</span>
+      <span class="exam-timer" id="exam-timer">00:00</span>
     </div>
 
     <div id="save-banner" class="save-banner">
@@ -155,7 +271,12 @@
     </div>
   </div>
 
+  <div id="toast-stack"></div>
+  <div id="token-counter" class="token-counter" title="Estimativa local, não é o contador oficial do provedor de IA">🪙 calculando…</div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="js/supabaseClient.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/storage.js"></script>
