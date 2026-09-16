@@ -38,7 +38,34 @@ let currentUser = null;
       sendMessage();
     }
   });
+
+  await maybeIniciarCalibragem();
 })();
+
+// Disparado quando o usuário clica em "Iniciar prova de calibragem" no Perfil
+// (index.html?calibragem=1). Só dispara sozinho se ainda não houver conversa
+// além da mensagem de boas-vindas, pra não interromper um chat em andamento.
+async function maybeIniciarCalibragem() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("calibragem") !== "1") return;
+  if (!currentUser) return;
+  if (state.messages.length > 1) return;
+
+  history.replaceState(null, "", window.location.pathname);
+
+  let mensagemInicial = "Quero fazer minha prova de calibragem inicial. Pode me propor o diagnóstico?";
+  try {
+    const perfil = await Store.getPerfil();
+    if (perfil.prova_alvo) {
+      mensagemInicial = `Quero fazer minha prova de calibragem inicial para a prova: ${perfil.prova_alvo}.`;
+    }
+  } catch (err) {
+    // segue com a mensagem genérica se não conseguir ler o perfil
+  }
+
+  document.getElementById("input").value = mensagemInicial;
+  await sendMessage();
+}
 
 async function sendMessage() {
   const input = document.getElementById("input");
@@ -49,14 +76,34 @@ async function sendMessage() {
   input.value = "";
   state.loading = true;
   hideBanner("save-banner");
+  hideBanner("materias-banner");
   hideBanner("error-banner");
   renderMessages();
 
   try {
+    let contexto = { perfil: null, materias: [], simulados: [] };
+    if (currentUser) {
+      try {
+        const [perfil, materias, simulados] = await Promise.all([
+          Store.getPerfil(),
+          Store.getMaterias(),
+          Store.getSimulados(),
+        ]);
+        contexto = { perfil, materias, simulados };
+      } catch (err) {
+        // Se der erro ao buscar o contexto, segue a conversa sem ele em vez de travar o chat.
+      }
+    }
+
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: state.messages, mode: state.mode, difficulty: state.difficulty }),
+      body: JSON.stringify({
+        messages: state.messages,
+        mode: state.mode,
+        difficulty: state.difficulty,
+        ...contexto,
+      }),
     });
     const data = await res.json();
 
@@ -66,6 +113,7 @@ async function sendMessage() {
       state.messages.push({ role: "assistant", content: data.reply });
       Store.setChatHistorico(state.messages);
       checkForScore(data.reply);
+      checkForMaterias(data.reply);
     }
   } catch (err) {
     showError(err.message);
@@ -118,6 +166,70 @@ function showSaveBanner(score) {
     }
   };
   document.getElementById("save-no").onclick = () => hideBanner("save-banner");
+}
+
+function checkForMaterias(reply) {
+  const match = reply.match(/mat[eé]rias identificadas:\s*([^\n]+)/i);
+  if (!match) return;
+  const itens = parseMateriasList(match[1]);
+  if (itens.length) showMateriasBanner(itens);
+}
+
+function parseMateriasList(texto) {
+  return texto
+    .split(",")
+    .map((pedaco) => {
+      const m = pedaco.trim().match(/^(.+?)\s*\((fraco|m[eé]dio|bom)\)$/i);
+      if (!m) return null;
+      const nivel = m[2]
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, ""); // "médio" -> "medio"
+      return { nome: m[1].trim(), nivel };
+    })
+    .filter(Boolean);
+}
+
+function showMateriasBanner(itens) {
+  const banner = document.getElementById("materias-banner");
+  const nomes = itens.map((i) => i.nome).join(", ");
+  banner.style.display = "flex";
+
+  if (!currentUser) {
+    banner.querySelector("span").textContent =
+      `Percebi um raio-x com estas matérias: ${nomes}. Crie uma conta ou entre para salvá-las.`;
+    document.getElementById("materias-yes").textContent = "Entrar / Criar conta";
+    document.getElementById("materias-yes").onclick = () => {
+      window.location.href = "login.html?next=index.html";
+    };
+    document.getElementById("materias-no").onclick = () => hideBanner("materias-banner");
+    return;
+  }
+
+  banner.querySelector("span").textContent =
+    `Percebi um raio-x com estas matérias: ${nomes}. Quer salvá-las na página "Matérias"?`;
+  document.getElementById("materias-yes").textContent = "Salvar";
+  document.getElementById("materias-yes").onclick = async () => {
+    try {
+      const existentes = await Store.getMaterias();
+      const nomesExistentes = new Set(existentes.map((m) => m.nome.trim().toLowerCase()));
+      const novas = itens.filter((i) => !nomesExistentes.has(i.nome.toLowerCase()));
+
+      for (const item of novas) {
+        await Store.addMateria({ nome: item.nome, nivel: item.nivel });
+      }
+
+      hideBanner("materias-banner");
+      if (novas.length) {
+        alert(`${novas.length} matéria(s) salva(s)! Veja na página "Matérias".`);
+      } else {
+        alert("Essas matérias já estavam cadastradas.");
+      }
+    } catch (err) {
+      showError("Não consegui salvar as matérias: " + err.message);
+    }
+  };
+  document.getElementById("materias-no").onclick = () => hideBanner("materias-banner");
 }
 
 function showError(message) {

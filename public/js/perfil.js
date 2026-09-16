@@ -26,10 +26,38 @@ let currentUser = null;
   document.getElementById("p-nome").addEventListener("change", salvarPerfil);
   document.getElementById("p-prova").addEventListener("change", salvarPerfil);
 
+  await renderCalibragemCta();
   await renderStats();
   await renderTree();
   await renderEvolucao();
 })();
+
+// Mostra um card convidando pra primeira "prova de calibragem" enquanto o
+// usuário ainda não tem nenhuma matéria mapeada nem simulado feito — ou seja,
+// só na primeira visita real ao Perfil.
+async function renderCalibragemCta() {
+  const [materias, simulados] = await Promise.all([Store.getMaterias(), Store.getSimulados()]);
+  if (materias.length > 0 || simulados.length > 0) return;
+
+  const card = document.createElement("div");
+  card.className = "panel";
+  card.style.cssText =
+    "padding:18px 20px; margin-bottom:28px; border-color:var(--accent); display:flex; gap:16px; align-items:center; flex-wrap:wrap;";
+  card.innerHTML = `
+    <div style="flex:1; min-width:220px;">
+      <div style="font-family:var(--serif); font-size:17px; margin-bottom:4px;">Faça sua prova de calibragem</div>
+      <div style="color:var(--ink-dim); font-size:13.5px;">
+        Ainda não sabemos seu nível em nada. Responda um diagnóstico rápido com o Treineiro
+        pra gente mapear suas matérias e começar sua árvore de skills.
+      </div>
+    </div>
+    <button class="btn btn-primary" id="calibragem-btn" style="flex-shrink:0;">Iniciar prova de calibragem</button>
+  `;
+  document.getElementById("perfil-content").prepend(card);
+  document.getElementById("calibragem-btn").addEventListener("click", () => {
+    window.location.href = "index.html?calibragem=1";
+  });
+}
 
 async function salvarPerfil() {
   await Store.setPerfil({

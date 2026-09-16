@@ -15,12 +15,18 @@ pessoa + **Sair**, se já estiver logada).
   partir do chat (quando a IA fecha a correção com "Pontuação final: X/Y")
   ou registrado manualmente.
 - **Matérias** (`materias.html`) — lista de matérias com nível (fraco /
-  médio / bom). Exige login.
+  médio / bom). Exige login. Pode ser preenchida automaticamente a partir do
+  chat: sempre que a IA apresenta ou atualiza um raio-x (linha
+  "Matérias identificadas: ..."), aparece um banner no chat oferecendo salvar
+  essas matérias de uma vez, sem duplicar as que já existem.
 - **Perfil** (`perfil.html`) — nome, prova alvo, estatísticas, a **árvore de
   skills** (cada matéria vira um "nó" ligado a você, com anel de progresso
   colorido conforme o nível) e a seção de **evolução**: um gráfico mostrando
   sua média geral de domínio ao longo do tempo, mais um histórico de quando
-  cada matéria mudou de nível. Exige login.
+  cada matéria mudou de nível. Exige login. Na primeira visita (sem nenhuma
+  matéria nem simulado ainda) aparece um card convidando a fazer a
+  **prova de calibragem**, que leva pro chat e já dispara automaticamente o
+  pedido de diagnóstico inicial pro Treineiro.
 
 Simulados/Matérias/Perfil pedem login porque os dados ficam guardados no
 Supabase, atrelados à conta — sem conta não tem onde guardar. Quem chega
@@ -165,8 +171,6 @@ README.md
 
 ## 5. Próximos passos sugeridos
 
-- Fazer o chat detectar e sugerir matérias automaticamente após o
-  diagnóstico, em vez de o usuário cadastrar na mão.
 - Exportar o plano de estudos em PDF.
 - Cronômetro real durante o simulado no nível "prova real".
 - Login social (Google) — o Supabase suporta, só precisa habilitar o
