@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treineiro — Matérias</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .add-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .add-row input { flex: 1; }
+    .add-row select { width: 170px; }
+
+    .materia-nome { flex: 1; font-size: 15px; }
+    .bar-track {
+      width: 140px;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--panel-raised);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .bar-fill { height: 100%; border-radius: 3px; }
+    .nivel-select {
+      width: 150px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="page">
+    <h1 class="page-title">Matérias</h1>
+    <p class="page-subtitle">Organize as matérias da sua prova e marque seu nível em cada uma. Isso alimenta a árvore de skills na página Perfil.</p>
+
+    <div class="add-row" id="add-row">
+      <input type="text" id="nova-materia" placeholder="Nome da matéria (ex: Matemática, Redação, Direito Constitucional)" />
+      <select id="novo-nivel">
+        <option value="fraco">fraco</option>
+        <option value="medio" selected>médio</option>
+        <option value="bom">bom</option>
+      </select>
+      <button class="btn btn-primary" id="add-btn">Adicionar</button>
+    </div>
+
+    <div class="panel" id="lista"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/authGate.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/materias.js"></script>
+</body>
+</html>

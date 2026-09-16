@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treineiro — Entrar</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-box {
+      width: 380px;
+      max-width: 100%;
+      padding: 36px 32px;
+    }
+    .login-brand {
+      font-family: var(--serif);
+      font-size: 26px;
+      margin: 0 0 4px;
+    }
+    .login-sub {
+      color: var(--ink-dim);
+      font-size: 13.5px;
+      margin: 0 0 28px;
+    }
+    .tabs {
+      display: flex;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .tabs button {
+      flex: 1;
+      padding: 10px 0;
+      background: transparent;
+      border: none;
+      color: var(--ink-dim);
+      cursor: pointer;
+      font-size: 13.5px;
+      border-right: 1px solid var(--line);
+    }
+    .tabs button:last-child { border-right: none; }
+    .tabs button.active { background: var(--panel-raised); color: var(--ink); }
+    .msg {
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .msg-error { border: 1px solid var(--red); }
+    .msg-success { border: 1px solid var(--green); }
+    .submit-btn { width: 100%; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-box panel">
+      <h1 class="login-brand">Treineiro</h1>
+      <p class="login-sub">Entre para acessar seu diagnóstico, simulados e árvore de skills.</p>
+
+      <div class="tabs">
+        <button id="tab-login" class="active">Entrar</button>
+        <button id="tab-signup">Criar conta</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+
+      <div class="field">
+        <label class="label" for="email">e-mail</label>
+        <input id="email" type="email" placeholder="voce@email.com" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label class="label" for="senha">senha</label>
+        <input id="senha" type="password" placeholder="mínimo 6 caracteres" autocomplete="current-password" />
+      </div>
+
+      <button class="btn btn-primary submit-btn" id="submit-btn">Entrar</button>
+
+      <p style="text-align:center; margin:18px 0 0;">
+        <a href="index.html" style="color:var(--ink-dim); font-size:13px;">← Voltar ao chat sem entrar</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

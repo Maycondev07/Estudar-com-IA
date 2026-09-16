@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treineiro — Simulados</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+    .simulado-info { display: flex; flex-direction: column; gap: 4px; }
+    .simulado-title { font-size: 15px; }
+    .simulado-meta { font-size: 12.5px; color: var(--ink-dim); }
+    .simulado-score {
+      font-family: var(--mono);
+      font-size: 15px;
+      text-align: right;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--ink-dim);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+    .del-btn:hover { color: var(--red); }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    .modal {
+      width: 420px;
+      max-width: calc(100vw - 40px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 26px;
+    }
+    .modal h2 {
+      font-family: var(--serif);
+      font-size: 20px;
+      margin: 0 0 18px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="page">
+    <div class="header-row">
+      <div>
+        <h1 class="page-title">Simulados</h1>
+        <p class="page-subtitle">Histórico dos simulados que você já fez. Simulados concluídos no chat do Início podem ser salvos aqui automaticamente, ou você pode registrar um manualmente.</p>
+      </div>
+      <button class="btn btn-primary" id="open-modal">+ Novo registro</button>
+    </div>
+
+    <div class="panel" id="lista"></div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal">
+      <h2>Registrar simulado</h2>
+      <div class="field">
+        <label class="label" for="f-prova">prova / certificação</label>
+        <input id="f-prova" type="text" placeholder="ex: Enem, OAB, AWS SAA" />
+      </div>
+      <div class="field">
+        <label class="label" for="f-dificuldade">dificuldade</label>
+        <select id="f-dificuldade">
+          <option value="aprendizado">🟩 aprendizado</option>
+          <option value="intermediario" selected>🟨 intermediário</option>
+          <option value="prova_real">🟥 prova real</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label" for="f-pontuacao">pontuação</label>
+        <input id="f-pontuacao" type="text" placeholder="ex: 7/10" />
+      </div>
+      <div class="field">
+        <label class="label" for="f-notas">notas (opcional)</label>
+        <textarea id="f-notas" rows="3" placeholder="o que errou, o que revisar..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancel-modal">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-modal">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/authGate.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/simulados.js"></script>
+</body>
+</html>
