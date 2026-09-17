@@ -1,7 +1,13 @@
 let mode = "login"; // ou "signup"
 
 const params = new URLSearchParams(location.search);
-const redirectTo = params.get("next") || "index.html";
+
+// Só aceita redirecionar para páginas internas conhecidas. Sem essa checagem,
+// um link como login.html?next=https://site-falso.com levaria o usuário pra
+// fora do site logo após o login (open redirect).
+const PAGINAS_INTERNAS = ["index.html", "simulados.html", "materias.html", "perfil.html"];
+const nextParam = params.get("next");
+const redirectTo = PAGINAS_INTERNAS.includes(nextParam) ? nextParam : "index.html";
 
 const tabLogin = document.getElementById("tab-login");
 const tabSignup = document.getElementById("tab-signup");
@@ -32,6 +38,10 @@ function hideMsg() {
 }
 
 submitBtn.addEventListener("click", async () => {
+  if (!supabaseClient) {
+    showMsg("O site não carregou por completo. Recarregue a página e tente de novo.", "error");
+    return;
+  }
   const email = document.getElementById("email").value.trim();
   const senha = document.getElementById("senha").value;
 
@@ -74,6 +84,7 @@ function traduzErro(msg) {
 
 // Se já estiver logado, pula direto para onde a pessoa queria ir
 (async () => {
+  if (!supabaseClient) return; // biblioteca não carregou; o aviso já está na tela
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();

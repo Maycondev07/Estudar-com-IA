@@ -2,6 +2,9 @@
 // logado — sem redirecionar. Use isso em páginas que funcionam também para
 // visitantes (não logados), como o chat.
 async function getOptionalUser() {
+  // Se a biblioteca do Supabase não carregou, o aviso já está na tela —
+  // aqui só evitamos a cascata de erros no console.
+  if (!supabaseClient) return null;
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();

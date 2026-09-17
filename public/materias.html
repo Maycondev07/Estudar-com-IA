@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Treineiro — Matérias</title>
+  <title>Gabarita — Matérias</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <meta name="description" content="Gabarita — seu preparador de provas com IA: diagnóstico, plano de estudos, simulados e árvore de skills." />
+  <meta name="theme-color" content="#161616" />
   <link rel="stylesheet" href="css/style.css" />
   <style>
     .add-row {
@@ -13,6 +16,16 @@
     }
     .add-row input { flex: 1; }
     .add-row select { width: 170px; }
+
+    @media (max-width: 560px) {
+      /* empilha o formulário: em 360px os três controles lado a lado
+         deixavam o campo de nome com poucos caracteres visíveis */
+      .add-row { flex-direction: column; align-items: stretch; }
+      .add-row select, .add-row input { width: 100%; }
+      /* o nome da matéria ganha a linha inteira, controles vão abaixo */
+      .list-row .materia-nome { flex: 1 1 100%; font-weight: 600; }
+      .list-row .bar-track { flex: 1 1 auto; }
+    }
 
     .materia-nome { flex: 1; font-size: 15px; }
     .bar-track {
@@ -55,6 +68,7 @@
   <script src="js/auth.js"></script>
   <script src="js/authGate.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/materias.js"></script>
 </body>

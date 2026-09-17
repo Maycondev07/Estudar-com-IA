@@ -1,4 +1,4 @@
-# Treineiro — site em HTML puro (multi-página, com login opcional e Supabase)
+# Gabarita — site em HTML puro (multi-página, com login opcional e Supabase)
 
 Site estático (HTML/CSS/JS puro, sem framework) com 5 páginas. **Login não é
 obrigatório para usar o chat** — qualquer visitante já cai direto no
@@ -21,7 +21,7 @@ pessoa + **Sair**, se já estiver logada).
   partir do chat (quando a IA fecha a correção com "Pontuação final: X/Y")
   ou registrado manualmente.
 - **Matérias** (`materias.html`) — lista de matérias com nível (fraco /
-  médio / bom). Exige login. Pode ser preenchida automaticamente a partir do
+  médio / bom), com renomear e excluir. Exige login. Pode ser preenchida automaticamente a partir do
   chat: sempre que a IA apresenta ou atualiza um raio-x (linha
   "Matérias identificadas: ..."), aparece um banner no chat oferecendo salvar
   essas matérias de uma vez, sem duplicar as que já existem.

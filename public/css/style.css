@@ -227,3 +227,136 @@ a {
   color: var(--ink-dim);
   font-size: 14px;
 }
+
+/* Tema escuro para inputs/selects fora de .field — sem isso eles herdavam o
+   visual branco padrão do navegador e destoavam do resto do site
+   (era o caso dos seletores de nível na página Matérias). */
+select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 9px 11px;
+  font-size: 14px;
+  outline: none;
+}
+
+select:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--accent);
+}
+
+select {
+  /* seta própria, já que a nativa fica clara demais no tema escuro */
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
+                    linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 30px;
+  cursor: pointer;
+}
+
+/* a lista aberta do select é desenhada pelo sistema; isto ajuda no Chrome */
+select option {
+  background: var(--panel-raised);
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   Responsivo — o projeto não tinha nenhuma media query até aqui, então em
+   telas de celular o conteúdo ficava apertado ou saía da área visível.
+   Breakpoints: 860px (tablet / paisagem) e 560px (celular).
+   ========================================================================== */
+
+@media (max-width: 860px) {
+  .navbar {
+    gap: 16px;
+    padding: 12px 20px;
+    flex-wrap: wrap;
+  }
+  .navbar nav {
+    order: 3;
+    width: 100%;
+    flex: none;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .navbar nav a {
+    white-space: nowrap;
+    padding: 7px 12px;
+  }
+  .navbar > div:last-child {
+    margin-left: auto;
+  }
+
+  .page {
+    padding: 28px 20px 64px;
+  }
+  .page-title {
+    font-size: 25px;
+  }
+}
+
+@media (max-width: 560px) {
+  .navbar {
+    padding: 10px 14px;
+  }
+  .navbar .brand {
+    font-size: 17px;
+  }
+  /* o e-mail ocupava a linha inteira no celular */
+  .navbar .label {
+    display: none;
+  }
+
+  .page {
+    padding: 22px 14px 56px;
+  }
+  .page-title {
+    font-size: 22px;
+  }
+  .page-subtitle {
+    font-size: 13.5px;
+    margin-bottom: 24px;
+  }
+
+  /* Linhas de lista viram blocos empilhados: em 360px de largura os itens
+     lado a lado espremiam o nome da matéria/simulado a poucos caracteres. */
+  .list-row {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .btn {
+    padding: 9px 14px;
+    font-size: 13.5px;
+  }
+
+  /* alvo de toque mínimo confortável */
+  .btn,
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: 40px;
+  }
+
+  /* 16px evita o zoom automático do iOS ao focar um campo */
+  .field input,
+  .field select,
+  .field textarea {
+    font-size: 16px;
+  }
+
+  .empty-state {
+    padding: 30px 14px;
+  }
+}

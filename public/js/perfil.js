@@ -60,11 +60,17 @@ async function renderCalibragemCta() {
 }
 
 async function salvarPerfil() {
-  await Store.setPerfil({
-    nome: document.getElementById("p-nome").value,
-    prova_alvo: document.getElementById("p-prova").value,
-  });
-  renderTree(); // o nó central usa o nome, então atualiza a árvore também
+  try {
+    await Store.setPerfil({
+      nome: document.getElementById("p-nome").value.trim(),
+      prova_alvo: document.getElementById("p-prova").value.trim(),
+    });
+    renderTree(); // o nó central usa o nome, então atualiza a árvore também
+    // antes os campos salvavam em silêncio e o usuário não tinha certeza
+    UI.toast("✓ Perfil salvo.");
+  } catch (err) {
+    UI.toast("Não consegui salvar o perfil: " + err.message, "erro");
+  }
 }
 
 // ---------- Estatísticas ----------
@@ -96,15 +102,23 @@ async function renderTree() {
     return;
   }
 
-  const rowHeight = 96;
+  // As posições eram fixas em pixel (raiz em 80, nós em 420), então em telas
+  // estreitas os nós ficavam fora da área visível. Agora tudo deriva da
+  // largura real do container.
+  const largura = Math.max(300, wrap.clientWidth);
+  const estreito = largura < 560;
+
+  const rowHeight = estreito ? 78 : 96;
   const height = Math.max(240, materias.length * rowHeight + 40);
   wrap.style.height = height + "px";
-  svg.setAttribute("viewBox", `0 0 640 ${height}`);
+  svg.setAttribute("viewBox", `0 0 ${largura} ${height}`);
   svg.setAttribute("preserveAspectRatio", "none");
 
-  const rootX = 80;
+  // Raiz à esquerda, nós a pouco mais da metade da largura — proporcional,
+  // para não sobrar espaço morto no desktop nem estourar no celular.
+  const rootX = estreito ? 52 : Math.max(80, largura * 0.12);
   const rootY = height / 2;
-  const nodeX = 420;
+  const nodeX = estreito ? Math.min(largura - 70, largura * 0.62) : largura * 0.58;
 
   let linesHtml = "";
   let nodesHtml = `
@@ -114,7 +128,7 @@ async function renderTree() {
   `;
 
   materias.forEach((m, i) => {
-    const nodeY = 60 + i * rowHeight;
+    const nodeY = (estreito ? 48 : 60) + i * rowHeight;
     const color = NIVEL_COLOR[m.nivel] || NIVEL_COLOR.medio;
     const pct = NIVEL_PCT[m.nivel] || NIVEL_PCT.medio;
 
@@ -185,9 +199,14 @@ function calcularMediaAoLongoDoTempo(history) {
   return pontos;
 }
 
+let ultimosPontos = null;
+
 function desenharGrafico(canvas, pontos) {
+  ultimosPontos = pontos;
   const dpr = window.devicePixelRatio || 1;
-  const cssWidth = canvas.parentElement.clientWidth - 32;
+  // Math.max evita largura 0/negativa (painel ainda sem layout), que faria
+  // o canvas estourar ou sumir.
+  const cssWidth = Math.max(240, canvas.parentElement.clientWidth - 32);
   const cssHeight = 180;
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
@@ -290,3 +309,18 @@ function renderHistoricoPorMateria(history) {
     container.appendChild(row);
   });
 }
+
+// Redesenha gráfico e árvore quando a janela muda de tamanho — os dois agora
+// dependem da largura real do container, então sem isso ficavam esticados,
+// cortados ou com os nós fora da tela ao girar o celular.
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const canvas = document.getElementById("evo-canvas");
+    if (ultimosPontos && ultimosPontos.length && canvas && canvas.style.display !== "none") {
+      desenharGrafico(canvas, ultimosPontos);
+    }
+    if (currentUser && document.getElementById("tree-wrap")) renderTree();
+  }, 150);
+});
