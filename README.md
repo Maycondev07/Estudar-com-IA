@@ -1,4 +1,4 @@
-# Gabarita — site em HTML puro (multi-página, com login opcional e Supabase)
+# Treineiro — site em HTML puro (multi-página, com login opcional e Supabase)
 
 Site estático (HTML/CSS/JS puro, sem framework) com 5 páginas. **Login não é
 obrigatório para usar o chat** — qualquer visitante já cai direto no
@@ -20,19 +20,26 @@ pessoa + **Sair**, se já estiver logada).
   (é onde os dados ficam guardados). Pode ser salvo automaticamente a
   partir do chat (quando a IA fecha a correção com "Pontuação final: X/Y")
   ou registrado manualmente.
-- **Matérias** (`materias.html`) — lista de matérias com nível (fraco /
-  médio / bom), com renomear e excluir. Exige login. Pode ser preenchida automaticamente a partir do
-  chat: sempre que a IA apresenta ou atualiza um raio-x (linha
-  "Matérias identificadas: ..."), aparece um banner no chat oferecendo salvar
-  essas matérias de uma vez, sem duplicar as que já existem.
+- **Matérias** (`materias.html`) — lista de matérias com domínio contínuo (0%
+  a 100%, em vez de só fraco/médio/bom), e que agora pode ter **submatérias**
+  (ramificações dentro de uma matéria, ex: Matemática → Funções, Geometria).
+  Exige login. Pode ser preenchida automaticamente a partir do chat: sempre
+  que a IA apresenta ou atualiza um raio-x (linha "Matérias identificadas:
+  ..."), aparece um banner no chat oferecendo salvar essas matérias de uma
+  vez, sem duplicar as que já existem.
 - **Perfil** (`perfil.html`) — nome, prova alvo, estatísticas, a **árvore de
-  skills** (cada matéria vira um "nó" ligado a você, com anel de progresso
-  colorido conforme o nível) e a seção de **evolução**: um gráfico mostrando
-  sua média geral de domínio ao longo do tempo, mais um histórico de quando
-  cada matéria mudou de nível. Exige login. Na primeira visita (sem nenhuma
-  matéria nem simulado ainda) aparece um card convidando a fazer a
-  **prova de calibragem**, que leva pro chat e já dispara automaticamente o
-  pedido de diagnóstico inicial pro Treineiro.
+  skills** (cada matéria vira um "nó" ligado a você, com submatérias
+  ramificando dela quando houver, e um anel de progresso com gradiente de
+  cor contínuo — vermelho a verde — proporcional ao % real de domínio, não
+  só 3 categorias fixas) e a seção de **evolução**: um gráfico mostrando sua
+  média geral de domínio (0–100%) ao longo do tempo, mais um histórico de
+  quando cada matéria/submatéria mudou de domínio. Exige login. Na primeira
+  visita (sem nenhuma matéria nem simulado ainda) aparece um card convidando
+  a fazer a **prova de calibragem**, que leva pro chat e já dispara
+  automaticamente o pedido de diagnóstico inicial pro Treineiro. A árvore de
+  skills e o gráfico de evolução usam o mesmo componente (`skillTree.js` +
+  `skillTree.css`) que também aparece no Professor, já que os dois sites
+  compartilham a mesma tabela `materias` no Supabase.
 
 Simulados/Matérias/Perfil pedem login porque os dados ficam guardados no
 Supabase, atrelados à conta — sem conta não tem onde guardar. Quem chega
@@ -47,8 +54,10 @@ Já criei um projeto Supabase de verdade para este site, chamado **Treineiro**
 - **Auth** cuida do login por e-mail/senha.
 - 4 tabelas guardam os dados: `profiles`, `materias`, `simulados` e
   `skill_history` (essa última é preenchida sozinha, por um gatilho no
-  banco, toda vez que uma matéria é criada ou muda de nível — é o que
-  alimenta o gráfico de evolução).
+  banco, toda vez que uma matéria é criada ou muda de domínio — é o que
+  alimenta o gráfico de evolução). `materias` tem uma coluna `parent_id`
+  opcional (auto-referência) pra suportar submatérias, e uma coluna
+  `dominio` numérica de 0 a 100 no lugar do antigo `nivel` fixo.
 - **Row Level Security (RLS)** está ativado em todas elas: cada usuário só
   consegue ler ou escrever nos próprios dados, mesmo que tente manipular as
   chamadas pelo navegador.
@@ -149,6 +158,7 @@ public/                         ← site estático (isso é o que vai pro ar)
   perfil.html                     → página Perfil (árvore de skills + evolução) — protegida por login
   css/
     style.css                     → estilos compartilhados por todas as páginas
+    skillTree.css                  → estilos da árvore de skills + evolução (idêntico ao do Professor)
   js/
     supabaseClient.js             → conexão com o projeto Supabase
     auth.js                        → sessão do usuário (getOptionalUser, requireAuth) e logout
@@ -156,10 +166,11 @@ public/                         ← site estático (isso é o que vai pro ar)
     login.js                       → lógica da página de login/cadastro
     storage.js                     → camada de dados (fala com o Supabase)
     nav.js                          → barra de navegação + botão sair
+    skillTree.js                    → árvore de skills + gráfico de evolução (idêntico ao do Professor)
     chat.js                         → lógica do chat (Início)
     simulados.js                     → lógica da página Simulados
-    materias.js                      → lógica da página Matérias
-    perfil.js                         → lógica do Perfil, árvore de skills e gráfico de evolução
+    materias.js                      → lógica da página Matérias (com submatérias)
+    perfil.js                         → lógica do Perfil (usa skillTree.js pra árvore/evolução)
 
 api/
   chat.js                        → função serverless da Vercel (chama lib/chatHandler.js)
@@ -195,7 +206,8 @@ create table public.materias (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   nome text not null,
-  nivel text not null check (nivel in ('fraco','medio','bom')),
+  dominio numeric not null default 50 check (dominio >= 0 and dominio <= 100),
+  parent_id uuid references public.materias(id) on delete cascade,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -215,7 +227,7 @@ create table public.skill_history (
   user_id uuid not null references auth.users(id) on delete cascade,
   materia_id uuid references public.materias(id) on delete cascade,
   materia_nome text not null,
-  nivel text not null check (nivel in ('fraco','medio','bom')),
+  dominio numeric not null check (dominio >= 0 and dominio <= 100),
   criado_em timestamptz default now()
 );
 
@@ -246,8 +258,8 @@ create trigger on_auth_user_created
 create function public.handle_materia_insert()
 returns trigger as $$
 begin
-  insert into public.skill_history (user_id, materia_id, materia_nome, nivel)
-  values (new.user_id, new.id, new.nome, new.nivel);
+  insert into public.skill_history (user_id, materia_id, materia_nome, dominio)
+  values (new.user_id, new.id, new.nome, new.dominio);
   return new;
 end;
 $$ language plpgsql security definer set search_path = public;
@@ -255,9 +267,9 @@ $$ language plpgsql security definer set search_path = public;
 create function public.handle_materia_update()
 returns trigger as $$
 begin
-  if new.nivel is distinct from old.nivel then
-    insert into public.skill_history (user_id, materia_id, materia_nome, nivel)
-    values (new.user_id, new.id, new.nome, new.nivel);
+  if new.dominio is distinct from old.dominio then
+    insert into public.skill_history (user_id, materia_id, materia_nome, dominio)
+    values (new.user_id, new.id, new.nome, new.dominio);
   end if;
   new.updated_at = now();
   return new;
@@ -276,3 +288,73 @@ revoke execute on function public.handle_materia_insert() from anon, authenticat
 revoke execute on function public.handle_materia_update() from anon, authenticated;
 revoke execute on function public.handle_new_user() from anon, authenticated;
 ```
+
+## 6.1. Migração (se seu banco já existe com o schema antigo de "nivel")
+
+Se seu projeto Supabase já estava rodando com `nivel text check (in fraco/medio/bom)`,
+rode o script abaixo no SQL Editor do Supabase pra migrar para o schema novo
+(domínio numérico 0–100% + submatérias via `parent_id`), sem perder os dados
+que já existem — cada nível vira um domínio aproximado (fraco→25, médio→55,
+bom→85):
+
+```sql
+-- 1. novas colunas em materias
+alter table public.materias add column if not exists dominio numeric;
+alter table public.materias add column if not exists parent_id uuid references public.materias(id) on delete cascade;
+
+update public.materias set dominio = case nivel
+  when 'fraco' then 25
+  when 'medio' then 55
+  when 'bom' then 85
+  else 50
+end
+where dominio is null;
+
+alter table public.materias alter column dominio set not null;
+alter table public.materias add constraint materias_dominio_check check (dominio >= 0 and dominio <= 100);
+alter table public.materias drop constraint if exists materias_nivel_check;
+alter table public.materias drop column if exists nivel;
+
+-- 2. mesma coisa em skill_history (mantém o histórico existente)
+alter table public.skill_history add column if not exists dominio numeric;
+
+update public.skill_history set dominio = case nivel
+  when 'fraco' then 25
+  when 'medio' then 55
+  when 'bom' then 85
+  else 50
+end
+where dominio is null;
+
+alter table public.skill_history alter column dominio set not null;
+alter table public.skill_history add constraint skill_history_dominio_check check (dominio >= 0 and dominio <= 100);
+alter table public.skill_history drop constraint if exists skill_history_nivel_check;
+alter table public.skill_history drop column if exists nivel;
+
+-- 3. recria as funções/gatilhos com os nomes de coluna novos (mesmo código do bloco 6 acima)
+create or replace function public.handle_materia_insert()
+returns trigger as $$
+begin
+  insert into public.skill_history (user_id, materia_id, materia_nome, dominio)
+  values (new.user_id, new.id, new.nome, new.dominio);
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function public.handle_materia_update()
+returns trigger as $$
+begin
+  if new.dominio is distinct from old.dominio then
+    insert into public.skill_history (user_id, materia_id, materia_nome, dominio)
+    values (new.user_id, new.id, new.nome, new.dominio);
+  end if;
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+```
+
+Depois de rodar isso, tanto o Treineiro quanto o Professor (que só lê a
+tabela `materias`) já passam a funcionar com o schema novo — não precisa
+mexer em mais nada no banco pelo lado do Professor.
+

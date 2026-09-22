@@ -89,5 +89,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Gabarita rodando em http://localhost:${PORT}`);
+  console.log(`Treineiro rodando em http://localhost:${PORT}`);
 });

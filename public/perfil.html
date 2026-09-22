@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gabarita — Perfil</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <meta name="description" content="Gabarita — seu preparador de provas com IA: diagnóstico, plano de estudos, simulados e árvore de skills." />
-  <meta name="theme-color" content="#161616" />
+  <title>Treineiro — Perfil</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/skillTree.css" />
   <style>
     .profile-header {
       display: flex;
@@ -38,80 +36,6 @@
       color: var(--ink-dim);
       margin-top: 6px;
     }
-
-    .tree-legend {
-      display: flex;
-      gap: 20px;
-      margin: 18px 0 10px;
-      font-size: 12.5px;
-      color: var(--ink-dim);
-    }
-    .tree-legend span { display:flex; align-items:center; gap:6px; }
-    .tree-legend .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
-
-    #tree-wrap {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--panel);
-    }
-    #tree-svg {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-    }
-    .node {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      width: 100px;
-      transform: translate(-50%, -50%);
-    }
-    .node-ring {
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .node-inner {
-      border-radius: 50%;
-      background: var(--panel);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--ink-dim);
-    }
-    .node-root .node-ring { width: 92px; height: 92px; background: var(--accent); }
-    .node-root .node-inner { width: 76px; height: 76px; font-family: var(--serif); font-size: 15px; color: var(--ink); }
-    .node-skill .node-ring { width: 74px; height: 74px; }
-    .node-skill .node-inner { width: 60px; height: 60px; }
-    .node-label {
-      font-size: 12.5px;
-      text-align: center;
-      line-height: 1.3;
-      max-width: 100px;
-    }
-
-    @media (max-width: 560px) {
-      .profile-header { gap: 24px; margin-bottom: 28px; }
-      .stats { gap: 18px; }
-      .stat { min-width: 84px; }
-      .stat-value { font-size: 24px; }
-      .tree-legend { gap: 12px; font-size: 11.5px; flex-wrap: wrap; }
-      /* nós menores para caber na largura do celular */
-      .node { width: 78px; gap: 4px; }
-      .node-root .node-ring { width: 68px; height: 68px; }
-      .node-root .node-inner { width: 56px; height: 56px; font-size: 13px; }
-      .node-skill .node-ring { width: 56px; height: 56px; }
-      .node-skill .node-inner { width: 45px; height: 45px; font-size: 10px; }
-      .node-label { font-size: 11px; max-width: 78px; }
-    }
   </style>
 </head>
 <body>
@@ -119,7 +43,7 @@
 
   <div class="page">
     <h1 class="page-title">Perfil</h1>
-    <p class="page-subtitle">Seus dados, seu progresso e a árvore de skills construída a partir das suas matérias.</p>
+    <p class="page-subtitle">Seus dados, seu progresso e a árvore de skills (com submatérias) construída a partir das suas matérias.</p>
 
     <div id="perfil-content">
     <div class="profile-header">
@@ -151,10 +75,17 @@
     </div>
 
     <div class="label">árvore de skills</div>
+    <p class="page-subtitle" style="margin-bottom:0">
+      Cada matéria pode ter submatérias (ex: Matemática → Funções, Geometria).
+      A cor e o preenchimento do anel mostram o domínio real, de 0% a 100% —
+      não só "fraco/médio/bom".
+    </p>
     <div class="tree-legend">
-      <span><span class="dot" style="background:var(--red)"></span> fraco</span>
-      <span><span class="dot" style="background:var(--yellow)"></span> médio</span>
-      <span><span class="dot" style="background:var(--green)"></span> bom</span>
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div class="gradient-bar"></div>
+        <div class="gradient-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+      </div>
+      <span class="hint" style="margin-left:auto">arraste a área abaixo pros lados pra ver árvores maiores</span>
     </div>
 
     <div id="tree-wrap">
@@ -164,17 +95,18 @@
 
     <div class="label" style="margin-top:44px">evolução geral</div>
     <p class="page-subtitle" style="margin-bottom:16px">
-      Média do seu nível de domínio ao longo do tempo (fraco = 1, médio = 2, bom = 3), atualizada
-      automaticamente sempre que você cadastra ou muda o nível de uma matéria.
+      Média do seu domínio (0% a 100%) ao longo do tempo, somando matérias e
+      submatérias, atualizada automaticamente sempre que você cadastra ou
+      ajusta o domínio de alguma delas.
     </p>
     <div class="panel" style="padding:16px;">
       <canvas id="evo-canvas" height="180"></canvas>
       <div id="evo-empty" class="empty-state" style="display:none">
-        Ainda não há histórico suficiente. Cadastre matérias e vá atualizando o nível delas conforme evolui.
+        Ainda não há histórico suficiente. Cadastre matérias e vá ajustando o domínio delas conforme evolui.
       </div>
     </div>
 
-    <div class="label" style="margin-top:32px">histórico por matéria</div>
+    <div class="label" style="margin-top:32px">histórico por matéria/submatéria</div>
     <div class="panel" id="historico-lista" style="margin-top:8px"></div>
     </div>
   </div>
@@ -184,8 +116,8 @@
   <script src="js/auth.js"></script>
   <script src="js/authGate.js"></script>
   <script src="js/storage.js"></script>
-  <script src="js/ui.js"></script>
   <script src="js/nav.js"></script>
+  <script src="js/skillTree.js"></script>
   <script src="js/perfil.js"></script>
 </body>
 </html>

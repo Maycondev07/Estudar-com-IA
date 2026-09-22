@@ -1,9 +1,3 @@
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str == null ? "" : str;
-  return div.innerHTML;
-}
-
 function renderNavbar(activePage, user) {
   const links = [
     { id: "inicio", href: "index.html", label: "Início" },
@@ -19,7 +13,7 @@ function renderNavbar(activePage, user) {
 
   const authArea = user
     ? `
-      <span class="label" style="text-transform:none">${escapeHtml(user.email)}</span>
+      <span class="label" style="text-transform:none">${user.email}</span>
       <button id="logout-btn" class="btn" style="padding:6px 14px; font-size:13px;">Sair</button>
     `
     : `
@@ -30,10 +24,7 @@ function renderNavbar(activePage, user) {
     `;
 
   el.innerHTML = `
-    <a class="brand" href="index.html" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:8px;">
-      <img src="favicon.svg" alt="" width="20" height="20" style="display:block;" />
-      Gabarita
-    </a>
+    <div class="brand">Treineiro</div>
     <nav>
       ${links
         .map(

@@ -46,28 +46,14 @@ const Store = (() => {
     return data;
   }
 
-  // Retorna a matéria já existente com esse nome (case/acento-insensível), ou null.
-  async function findMateriaPorNome(nome) {
-    const alvo = normalizarTexto(nome);
-    const materias = await getMaterias();
-    return materias.find((m) => normalizarTexto(m.nome) === alvo) || null;
-  }
-
-  function normalizarTexto(s) {
-    return (s || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  }
-
-  // Retorna { criada: true } se inseriu, ou { criada: false } se já existia.
   async function addMateria(materia) {
-    const existente = await findMateriaPorNome(materia.nome);
-    if (existente) return { criada: false, materia: existente };
-    const { error } = await supabaseClient.from("materias").insert({ user_id: userId, ...materia });
+    const { data, error } = await supabaseClient
+      .from("materias")
+      .insert({ user_id: userId, ...materia })
+      .select()
+      .single();
     if (error) throw error;
-    return { criada: true };
+    return data;
   }
 
   async function updateMateria(id, changes) {
@@ -91,12 +77,7 @@ const Store = (() => {
   }
 
   async function setPerfil(changes) {
-    // upsert (não update) porque contas criadas antes do trigger
-    // `on_auth_user_created` existir podem não ter linha em profiles —
-    // com update puro a gravação falharia em silêncio (0 linhas afetadas).
-    const { error } = await supabaseClient
-      .from("profiles")
-      .upsert({ id: userId, ...changes }, { onConflict: "id" });
+    const { error } = await supabaseClient.from("profiles").update(changes).eq("id", userId);
     if (error) throw error;
   }
 
@@ -116,32 +97,13 @@ const Store = (() => {
   }
 
   // ---------- Histórico de chat (fica só no navegador, por usuário) ----------
-  // Guarda no máximo as últimas MAX_CHAT_MSGS mensagens: sem isso o histórico
-  // cresce sem limite, estoura a cota do localStorage e infla o custo de
-  // tokens (o chat reenvia a conversa inteira a cada mensagem).
-  const MAX_CHAT_MSGS = 40;
-
   function getChatHistorico() {
-    try {
-      const raw = localStorage.getItem("treineiro_chat_" + userId);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length ? parsed : null;
-    } catch (err) {
-      // histórico corrompido não pode derrubar a página inteira
-      console.warn("Histórico de chat inválido, começando do zero.", err);
-      localStorage.removeItem("treineiro_chat_" + userId);
-      return null;
-    }
+    const raw = localStorage.getItem("treineiro_chat_" + userId);
+    return raw ? JSON.parse(raw) : null;
   }
 
   function setChatHistorico(messages) {
-    try {
-      const recortado = messages.length > MAX_CHAT_MSGS ? messages.slice(-MAX_CHAT_MSGS) : messages;
-      localStorage.setItem("treineiro_chat_" + userId, JSON.stringify(recortado));
-    } catch (err) {
-      console.warn("Não consegui salvar o histórico do chat.", err);
-    }
+    localStorage.setItem("treineiro_chat_" + userId, JSON.stringify(messages));
   }
 
   return {
@@ -150,7 +112,6 @@ const Store = (() => {
     addSimulado,
     deleteSimulado,
     getMaterias,
-    findMateriaPorNome,
     addMateria,
     updateMateria,
     deleteMateria,

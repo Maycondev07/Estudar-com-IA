@@ -23,10 +23,14 @@ const DIFF_LABELS = {
 })();
 
 function formatDate(iso) {
-  if (!iso) return "sem data";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "sem data"; // evita mostrar "Invalid Date"
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 async function renderLista() {
@@ -46,7 +50,7 @@ async function renderLista() {
     row.className = "list-row";
     row.innerHTML = `
       <span class="chip"><span class="chip-dot ${diff.dot}"></span>${diff.label}</span>
-      <div class="simulado-info">
+      <div class="simulado-info" style="flex:1">
         <div class="simulado-title"></div>
         <div class="simulado-meta">${formatDate(s.data)}${s.notas ? " · " + escapeHtml(s.notas) : ""}</div>
       </div>
@@ -56,18 +60,9 @@ async function renderLista() {
     row.querySelector(".simulado-title").textContent = s.prova;
     row.querySelector(".simulado-score").textContent = s.pontuacao || "—";
     row.querySelector(".del-btn").addEventListener("click", async () => {
-      const ok = await UI.confirmar({
-        titulo: "Excluir simulado?",
-        mensagem: `"${s.prova}" sai do seu histórico. Essa ação não pode ser desfeita.`,
-        confirmar: "Excluir",
-        perigo: true,
-      });
-      if (!ok) return;
-      try {
+      if (confirm("Excluir este registro de simulado?")) {
         await Store.deleteSimulado(s.id);
         renderLista();
-      } catch (err) {
-        UI.toast("Não consegui excluir: " + err.message, "erro");
       }
     });
     lista.appendChild(row);
@@ -94,34 +89,18 @@ function attachModalEvents() {
   });
 
   document.getElementById("confirm-modal").addEventListener("click", async () => {
-    const btn = document.getElementById("confirm-modal");
     const prova = document.getElementById("f-prova").value.trim();
     if (!prova) {
-      UI.toast("Escreva o nome da prova/certificação.", "erro");
-      document.getElementById("f-prova").focus();
+      alert("Escreva o nome da prova/certificação.");
       return;
     }
-    btn.disabled = true; // evita duplicar o registro com clique duplo
-    try {
-      await Store.addSimulado({
-        prova,
-        dificuldade: document.getElementById("f-dificuldade").value,
-        pontuacao: document.getElementById("f-pontuacao").value.trim(),
-        notas: document.getElementById("f-notas").value.trim(),
-      });
-      backdrop.style.display = "none";
-      renderLista();
-    } catch (err) {
-      UI.toast("Não consegui salvar: " + err.message, "erro");
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
-  // fechar o modal com Esc
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && backdrop.style.display === "flex") {
-      backdrop.style.display = "none";
-    }
+    await Store.addSimulado({
+      prova,
+      dificuldade: document.getElementById("f-dificuldade").value,
+      pontuacao: document.getElementById("f-pontuacao").value.trim(),
+      notas: document.getElementById("f-notas").value.trim(),
+    });
+    backdrop.style.display = "none";
+    renderLista();
   });
 }

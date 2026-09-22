@@ -6,7 +6,6 @@ const WELCOME = `Oi! Eu sou o Treineiro. Me diz qual prova, vestibular ou certif
 const DAILY_TOKEN_BUDGET = 200000;
 
 const PAGINAS_PERMITIDAS = ["index.html", "materias.html", "simulados.html", "perfil.html", "login.html"];
-const NIVEIS_VALIDOS = ["fraco", "medio", "bom"];
 
 let state = {
   messages: [{ role: "assistant", content: WELCOME }],
@@ -37,11 +36,6 @@ if (window.marked) {
     state.mode = btn.dataset.mode;
     document.querySelectorAll("#mode-seg button").forEach((b) => b.classList.toggle("active", b === btn));
     document.getElementById("difficulty-wrap").style.display = state.mode === "simulado" ? "flex" : "none";
-    if (state.mode !== "simulado") {
-      // sem isso a dificuldade antiga continuava sendo enviada no modo livre
-      state.difficulty = null;
-      document.querySelectorAll("#difficulty-seg button").forEach((b) => b.classList.remove("active"));
-    }
     aplicarModoVisual();
   });
 
@@ -51,22 +45,6 @@ if (window.marked) {
     state.difficulty = btn.dataset.diff;
     document.querySelectorAll("#difficulty-seg button").forEach((b) => b.classList.toggle("active", b === btn));
     atualizarExamBadge();
-  });
-
-  document.getElementById("clear-chat").addEventListener("click", async () => {
-    const ok = await UI.confirmar({
-      titulo: "Limpar conversa",
-      mensagem: "Isso apaga todas as mensagens deste chat. Seus simulados e matérias salvos não são afetados.",
-      confirmar: "Limpar",
-      perigo: true,
-    });
-    if (!ok) return;
-    state.messages = [{ role: "assistant", content: WELCOME }];
-    Store.setChatHistorico(state.messages);
-    hideBanner("save-banner");
-    hideBanner("materias-banner");
-    hideBanner("error-banner");
-    renderMessages();
   });
 
   document.getElementById("send-btn").addEventListener("click", sendMessage);
@@ -79,9 +57,6 @@ if (window.marked) {
 
   await maybeIniciarCalibragem();
 })();
-
-// o rótulo do contador muda de tamanho conforme a largura da tela
-window.addEventListener("resize", renderTokenCounter);
 
 // Disparado quando o usuário clica em "Iniciar prova de calibragem" no Perfil
 // (index.html?calibragem=1). Só dispara sozinho se ainda não houver conversa
@@ -177,35 +152,26 @@ async function sendMessage() {
       }
     }
 
-    // Mantém só as últimas mensagens na requisição: sem isso a conversa
-    // inteira é reenviada a cada turno e o custo em tokens cresce sem limite.
-    const MAX_ENVIO = 30;
-    if (state.messages.length > MAX_ENVIO) {
-      state.messages = state.messages.slice(-MAX_ENVIO);
-    }
-
-    const { ok, data } = await chamarApiComRetry({
-      messages: state.messages,
-      mode: state.mode,
-      difficulty: state.difficulty,
-      ...contexto,
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: state.messages,
+        mode: state.mode,
+        difficulty: state.difficulty,
+        ...contexto,
+      }),
     });
+    const data = await res.json();
 
-    if (!ok) {
-      showError(traduzErroIa(data && data.error) || "Erro desconhecido ao falar com a IA.");
+    if (!res.ok) {
+      showError(data.error || "Erro desconhecido.");
     } else {
       const { texto, acoes } = extrairAcoes(data.reply);
-      // A detecção usa o texto bruto (com a linha interna); o que vai pra tela
-      // é a versão limpa.
+      state.messages.push({ role: "assistant", content: texto });
+      Store.setChatHistorico(state.messages);
       checkForScore(texto);
       checkForMaterias(texto);
-
-      const visivel = limparLinhasInternas(texto);
-      if (visivel) {
-        state.messages.push({ role: "assistant", content: visivel });
-        Store.setChatHistorico(state.messages);
-      }
-
       if (data.usage && data.usage.total_tokens) {
         registrarTokensUsados(data.usage.total_tokens);
       }
@@ -215,64 +181,14 @@ async function sendMessage() {
       }
     }
   } catch (err) {
-    showError(traduzErroIa(err.message));
+    showError(err.message);
   } finally {
     state.loading = false;
     renderMessages();
   }
 }
 
-// Erros 503 (sobrecarga) e 429 (limite de taxa) são temporários: vale tentar
-// de novo sozinho antes de incomodar o usuário com uma mensagem de erro.
-async function chamarApiComRetry(payload, tentativas = 3) {
-  let ultimoErro = null;
-
-  for (let i = 0; i < tentativas; i++) {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-
-    if (res.ok) return { ok: true, data };
-
-    ultimoErro = data;
-    const transitorio = res.status === 503 || res.status === 429 || /503|429|high demand|overload|UNAVAILABLE/i.test(data.error || "");
-    if (!transitorio || i === tentativas - 1) break;
-
-    atualizarStatusCarregando(`provedor de IA ocupado — tentando de novo (${i + 2}/${tentativas})…`);
-    await new Promise((r) => setTimeout(r, 1200 * (i + 1))); // espera progressiva
-  }
-
-  return { ok: false, data: ultimoErro };
-}
-
-// Traduz os erros técnicos do provedor pra algo que o usuário entenda.
-function traduzErroIa(msg) {
-  const m = msg || "";
-  if (/503|high demand|overload|UNAVAILABLE/i.test(m)) {
-    return "O provedor de IA está sobrecarregado no momento. Já tentei algumas vezes — espere alguns segundos e envie de novo.";
-  }
-  if (/429|rate limit|RESOURCE_EXHAUSTED|quota/i.test(m)) {
-    return "Você atingiu o limite de uso da IA por agora. Espere um minuto (ou até amanhã, se for o limite diário) e tente de novo.";
-  }
-  if (/AI_API_KEY/i.test(m)) {
-    return "A chave da API de IA não está configurada no servidor. Confira as variáveis de ambiente na Vercel.";
-  }
-  if (/401|403|API key|invalid/i.test(m)) {
-    return "A chave da API de IA parece inválida ou sem permissão. Confira a configuração no servidor.";
-  }
-  if (/failed to fetch|networkerror/i.test(m)) {
-    return "Não consegui falar com o servidor. Verifique sua conexão e tente de novo.";
-  }
-  return m;
-}
-
-function atualizarStatusCarregando(texto) {
-  const el = document.getElementById("loading-status");
-  if (el) el.textContent = texto;
-}
+// ---------- Ações que a IA pode executar direto no site ----------
 function extrairAcoes(reply) {
   const linhas = reply.split("\n");
   const acoes = [];
@@ -288,21 +204,7 @@ function extrairAcoes(reply) {
   });
 
   const texto = restante.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  // Se a IA respondeu SÓ com linhas de ação, não dá pra cair de volta no
-  // reply original (isso mostraria as linhas cruas pro usuário). Nesse caso
-  // fica sem texto e o feedback vem pelos toasts.
-  return { texto, acoes };
-}
-
-// A linha "Matérias identificadas: ..." é um canal interno pro site montar o
-// banner de confirmação — não deve aparecer crua na conversa.
-function limparLinhasInternas(texto) {
-  return texto
-    .split("\n")
-    .filter((l) => !/^\s*mat[eé]rias identificadas:/i.test(l))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return { texto: texto || reply, acoes };
 }
 
 function parseArgsAcao(str) {
@@ -317,12 +219,21 @@ function parseArgsAcao(str) {
   return args;
 }
 
-function normalizarNivel(v) {
-  const n = (v || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  return NIVEIS_VALIDOS.includes(n) ? n : "medio";
+function normalizarDominio(v) {
+  const n = Math.round(Number(v));
+  if (Number.isNaN(n)) return 50;
+  return Math.max(0, Math.min(100, n));
+}
+
+function encontrarMateriaPorNome(materias, nome, preferirRaiz) {
+  const alvo = nome.trim().toLowerCase();
+  const candidatos = materias.filter((m) => m.nome.trim().toLowerCase() === alvo);
+  if (candidatos.length <= 1) return candidatos[0];
+  if (preferirRaiz) {
+    const raiz = candidatos.find((m) => !m.parent_id);
+    if (raiz) return raiz;
+  }
+  return candidatos[0];
 }
 
 async function executarAcoes(acoes) {
@@ -343,43 +254,29 @@ async function executarAcoes(acoes) {
         }
       } else if (acao.tipo === "adicionar_materia") {
         if (!acao.args.nome) continue;
-        const r = await Store.addMateria({ nome: acao.args.nome, nivel: normalizarNivel(acao.args.nivel) });
-        showToast(
-          r.criada
-            ? `✓ Matéria "${acao.args.nome}" adicionada.`
-            : `"${acao.args.nome}" já estava cadastrada.`
-        );
+        let parentId = null;
+        if (acao.args.pai) {
+          const materias = await Store.getMaterias();
+          const pai = encontrarMateriaPorNome(materias, acao.args.pai, true);
+          if (pai) parentId = pai.id;
+        }
+        await Store.addMateria({ nome: acao.args.nome, dominio: normalizarDominio(acao.args.dominio), parent_id: parentId });
+        showToast(`✓ Matéria "${acao.args.nome}" adicionada.`);
       } else if (acao.tipo === "atualizar_materia") {
         if (!acao.args.nome) continue;
-        const alvo = await Store.findMateriaPorNome(acao.args.nome);
+        const materias = await Store.getMaterias();
+        const alvo = encontrarMateriaPorNome(materias, acao.args.nome, true);
         if (alvo) {
-          await Store.updateMateria(alvo.id, { nivel: normalizarNivel(acao.args.nivel) });
-          showToast(`✓ Nível de "${acao.args.nome}" atualizado.`);
-        } else {
-          showToast(`Não achei a matéria "${acao.args.nome}" pra atualizar.`, "erro");
+          await Store.updateMateria(alvo.id, { dominio: normalizarDominio(acao.args.dominio) });
+          showToast(`✓ Domínio de "${acao.args.nome}" atualizado.`);
         }
-      } else if (acao.tipo === "renomear_materia") {
-        if (!acao.args.nome || !acao.args.novo_nome) continue;
-        const alvo = await Store.findMateriaPorNome(acao.args.nome);
-        if (!alvo) {
-          showToast(`Não achei a matéria "${acao.args.nome}" pra renomear.`, "erro");
-          continue;
-        }
-        const conflito = await Store.findMateriaPorNome(acao.args.novo_nome);
-        if (conflito && conflito.id !== alvo.id) {
-          showToast(`Já existe uma matéria chamada "${acao.args.novo_nome}".`, "erro");
-          continue;
-        }
-        await Store.updateMateria(alvo.id, { nome: acao.args.novo_nome });
-        showToast(`✓ "${acao.args.nome}" renomeada para "${acao.args.novo_nome}".`);
       } else if (acao.tipo === "remover_materia") {
         if (!acao.args.nome) continue;
-        const alvo = await Store.findMateriaPorNome(acao.args.nome);
+        const materias = await Store.getMaterias();
+        const alvo = encontrarMateriaPorNome(materias, acao.args.nome, true);
         if (alvo) {
           await Store.deleteMateria(alvo.id);
           showToast(`✓ Matéria "${acao.args.nome}" removida.`);
-        } else {
-          showToast(`Não achei a matéria "${acao.args.nome}" pra remover.`, "erro");
         }
       } else if (acao.tipo === "navegar") {
         const pagina = (acao.args.pagina || "").trim();
@@ -418,10 +315,7 @@ function renderTokenCounter() {
   if (!el) return;
   const usados = getTokensUsadosHoje();
   const restantes = Math.max(0, DAILY_TOKEN_BUDGET - usados);
-  const fmt = restantes.toLocaleString("pt-BR");
-  // No celular o texto completo ocupava metade da largura da tela.
-  el.textContent =
-    window.innerWidth < 560 ? `🪙 ${fmt}` : `🪙 ${fmt} tokens restantes hoje (estimativa)`;
+  el.textContent = `🪙 ${restantes.toLocaleString("pt-BR")} tokens restantes hoje (estimativa)`;
 }
 
 // ---------- Toasts (feedback rápido de ações) ----------
@@ -462,20 +356,8 @@ function showSaveBanner(score) {
     'Percebi uma pontuação nessa correção. Quer salvar esse simulado na página "Simulados"?';
   document.getElementById("save-yes").textContent = "Salvar";
   document.getElementById("save-yes").onclick = async () => {
-    let sugestao = "";
-    try {
-      const perfil = await Store.getPerfil();
-      sugestao = perfil.prova_alvo || "";
-    } catch (err) {
-      /* sem sugestão é aceitável */
-    }
-    const prova = await UI.perguntar({
-      titulo: "Salvar simulado",
-      mensagem: "Qual prova ou certificação foi esse simulado?",
-      valorInicial: sugestao,
-      campo: { placeholder: "ex: Enem, OAB 1ª fase…" },
-    });
-    if (prova === null) return; // cancelado
+    const prova = prompt("Qual prova/certificação foi esse simulado?", "");
+    if (prova === null) return;
     try {
       await Store.addSimulado({
         prova: prova || "Simulado sem nome",
@@ -484,7 +366,7 @@ function showSaveBanner(score) {
         notas: "",
       });
       hideBanner("save-banner");
-      showToast('✓ Simulado salvo. Veja na página "Simulados".');
+      alert('Simulado salvo! Veja na página "Simulados".');
     } catch (err) {
       showError("Não consegui salvar o simulado: " + err.message);
     }
@@ -503,20 +385,16 @@ function parseMateriasList(texto) {
   return texto
     .split(",")
     .map((pedaco) => {
-      const m = pedaco.trim().match(/^(.+?)\s*\((fraco|m[eé]dio|bom)\)$/i);
+      const m = pedaco.trim().match(/^(?:(.+?)\s*>\s*)?(.+?)\s*\((\d{1,3})\s*%\)$/);
       if (!m) return null;
-      const nivel = m[2]
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, ""); // "médio" -> "medio"
-      return { nome: m[1].trim(), nivel };
+      return { pai: m[1] ? m[1].trim() : null, nome: m[2].trim(), dominio: normalizarDominio(m[3]) };
     })
     .filter(Boolean);
 }
 
 function showMateriasBanner(itens) {
   const banner = document.getElementById("materias-banner");
-  const nomes = itens.map((i) => i.nome).join(", ");
+  const nomes = itens.map((i) => (i.pai ? `${i.pai} > ${i.nome}` : i.nome)).join(", ");
   banner.style.display = "flex";
 
   if (!currentUser) {
@@ -535,18 +413,43 @@ function showMateriasBanner(itens) {
   document.getElementById("materias-yes").textContent = "Salvar";
   document.getElementById("materias-yes").onclick = async () => {
     try {
+      const existentes = await Store.getMaterias();
+      const chaveExistente = (nome, paiId) => `${nome.trim().toLowerCase()}|${paiId || ""}`;
+      const existentesSet = new Set(existentes.map((m) => chaveExistente(m.nome, m.parent_id)));
+
+      // Matérias-pai primeiro (sem "pai" no item, ou cujo pai já existe/já foi
+      // criado nesta mesma leva), pra garantir que o parent_id exista antes de
+      // criar a submatéria — repete algumas passadas até estabilizar.
+      const pendentes = [...itens];
+      const idPorNome = new Map(existentes.filter((m) => !m.parent_id).map((m) => [m.nome.trim().toLowerCase(), m.id]));
+      let progresso = true;
       let salvas = 0;
-      for (const item of itens) {
-        const r = await Store.addMateria({ nome: item.nome, nivel: item.nivel });
-        if (r.criada) salvas++;
+
+      while (pendentes.length && progresso) {
+        progresso = false;
+        for (let i = pendentes.length - 1; i >= 0; i--) {
+          const item = pendentes[i];
+          const parentId = item.pai ? idPorNome.get(item.pai.trim().toLowerCase()) : null;
+          if (item.pai && !parentId) continue; // ainda esperando o pai ser criado
+
+          const chave = chaveExistente(item.nome, parentId);
+          if (!existentesSet.has(chave)) {
+            const criada = await Store.addMateria({ nome: item.nome, dominio: item.dominio, parent_id: parentId || null });
+            existentesSet.add(chave);
+            if (!item.pai && criada) idPorNome.set(item.nome.trim().toLowerCase(), criada.id);
+            salvas++;
+          }
+          pendentes.splice(i, 1);
+          progresso = true;
+        }
       }
 
       hideBanner("materias-banner");
-      showToast(
-        salvas
-          ? `✓ ${salvas} matéria(s) salva(s). Veja na página "Matérias".`
-          : "Essas matérias já estavam cadastradas."
-      );
+      if (salvas > 0) {
+        alert(`${salvas} matéria(s) salva(s)! Veja na página "Matérias".`);
+      } else {
+        alert("Essas matérias já estavam cadastradas.");
+      }
     } catch (err) {
       showError("Não consegui salvar as matérias: " + err.message);
     }
@@ -584,12 +487,9 @@ function renderMessages() {
   });
   if (state.loading) {
     const row = document.createElement("div");
-    row.id = "loading-status";
     row.style.cssText = "padding:16px 0; color:var(--ink-dim); font-family:var(--mono); font-size:13px;";
     row.textContent = "treineiro está escrevendo…";
     container.appendChild(row);
   }
-  const sendBtn = document.getElementById("send-btn");
-  if (sendBtn) sendBtn.disabled = state.loading;
   container.scrollTop = container.scrollHeight;
 }

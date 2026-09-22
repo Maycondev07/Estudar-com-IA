@@ -3,33 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gabarita — Matérias</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <meta name="description" content="Gabarita — seu preparador de provas com IA: diagnóstico, plano de estudos, simulados e árvore de skills." />
-  <meta name="theme-color" content="#161616" />
+  <title>Treineiro — Matérias</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
     .add-row {
       display: flex;
       gap: 10px;
-      margin-bottom: 22px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      align-items: center;
     }
-    .add-row input { flex: 1; }
-    .add-row select { width: 170px; }
-
-    @media (max-width: 560px) {
-      /* empilha o formulário: em 360px os três controles lado a lado
-         deixavam o campo de nome com poucos caracteres visíveis */
-      .add-row { flex-direction: column; align-items: stretch; }
-      .add-row select, .add-row input { width: 100%; }
-      /* o nome da matéria ganha a linha inteira, controles vão abaixo */
-      .list-row .materia-nome { flex: 1 1 100%; font-weight: 600; }
-      .list-row .bar-track { flex: 1 1 auto; }
+    .add-row input[type="text"] { flex: 1; min-width: 200px; }
+    .add-row select { width: 220px; flex-shrink: 0; }
+    .add-row .dominio-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
     }
+    .add-row input[type="range"] { width: 130px; }
+    .add-row .dominio-num { font-family: var(--mono); font-size: 12.5px; width: 38px; text-align: right; }
+    .add-hint { color: var(--ink-dim); font-size: 12.5px; margin-bottom: 22px; }
 
+    .materia-row { align-items: center; }
     .materia-nome { flex: 1; font-size: 15px; }
+    .materia-nome.sub { font-size: 13.5px; color: var(--ink-dim); }
     .bar-track {
-      width: 140px;
+      width: 120px;
       height: 6px;
       border-radius: 3px;
       background: var(--panel-raised);
@@ -37,8 +37,16 @@
       flex-shrink: 0;
     }
     .bar-fill { height: 100%; border-radius: 3px; }
-    .nivel-select {
-      width: 150px;
+    .dominio-slider { width: 120px; flex-shrink: 0; }
+    .dominio-num { font-family: var(--mono); font-size: 12.5px; width: 36px; text-align: right; flex-shrink: 0; }
+    .sub-list { margin: 2px 0 10px 30px; border-left: 2px solid var(--line); padding-left: 14px; }
+    .add-sub-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 6px;
       flex-shrink: 0;
     }
   </style>
@@ -48,17 +56,20 @@
 
   <div class="page">
     <h1 class="page-title">Matérias</h1>
-    <p class="page-subtitle">Organize as matérias da sua prova e marque seu nível em cada uma. Isso alimenta a árvore de skills na página Perfil.</p>
+    <p class="page-subtitle">Organize as matérias da sua prova (e, se quiser, ramifique em submatérias) e ajuste o domínio real em cada uma, de 0% a 100%. Isso alimenta a árvore de skills na página Perfil.</p>
 
     <div class="add-row" id="add-row">
-      <input type="text" id="nova-materia" placeholder="Nome da matéria (ex: Matemática, Redação, Direito Constitucional)" />
-      <select id="novo-nivel">
-        <option value="fraco">fraco</option>
-        <option value="medio" selected>médio</option>
-        <option value="bom">bom</option>
+      <input type="text" id="nova-materia" placeholder="Nome da matéria ou submatéria" />
+      <select id="novo-pai">
+        <option value="">— matéria própria (nível raiz) —</option>
       </select>
+      <div class="dominio-field">
+        <input type="range" id="novo-dominio" min="0" max="100" value="50" />
+        <span class="dominio-num" id="novo-dominio-label">50%</span>
+      </div>
       <button class="btn btn-primary" id="add-btn">Adicionar</button>
     </div>
+    <p class="add-hint">Escolha uma matéria em "dentro de" pra criar uma submatéria (ex: "Funções" dentro de "Matemática").</p>
 
     <div class="panel" id="lista"></div>
   </div>
@@ -68,8 +79,8 @@
   <script src="js/auth.js"></script>
   <script src="js/authGate.js"></script>
   <script src="js/storage.js"></script>
-  <script src="js/ui.js"></script>
   <script src="js/nav.js"></script>
+  <script src="js/skillTree.js"></script>
   <script src="js/materias.js"></script>
 </body>
 </html>
